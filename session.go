@@ -13,7 +13,7 @@ import (
 type Session struct {
 	Request *http.Request
 	Keys    map[string]interface{}
-	conn    *websocket.Conn
+	Conn    *websocket.Conn
 	output  chan *envelope
 	melody  *Melody
 	open    bool
@@ -38,8 +38,8 @@ func (s *Session) writeRaw(message *envelope) error {
 		return errors.New("tried to write to a closed session")
 	}
 
-	s.conn.SetWriteDeadline(time.Now().Add(s.melody.Config.WriteWait))
-	err := s.conn.WriteMessage(message.t, message.msg)
+	s.Conn.SetWriteDeadline(time.Now().Add(s.melody.Config.WriteWait))
+	err := s.Conn.WriteMessage(message.t, message.msg)
 
 	if err != nil {
 		return err
@@ -59,7 +59,7 @@ func (s *Session) close() {
 	if !s.closed() {
 		s.rwmutex.Lock()
 		s.open = false
-		s.conn.Close()
+		s.Conn.Close()
 		close(s.output)
 		s.rwmutex.Unlock()
 	}
@@ -106,23 +106,23 @@ loop:
 }
 
 func (s *Session) readPump() {
-	s.conn.SetReadLimit(s.melody.Config.MaxMessageSize)
-	s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
+	s.Conn.SetReadLimit(s.melody.Config.MaxMessageSize)
+	s.Conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
 
-	s.conn.SetPongHandler(func(string) error {
-		s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
+	s.Conn.SetPongHandler(func(string) error {
+		s.Conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
 		s.melody.pongHandler(s)
 		return nil
 	})
 
 	if s.melody.closeHandler != nil {
-		s.conn.SetCloseHandler(func(code int, text string) error {
+		s.Conn.SetCloseHandler(func(code int, text string) error {
 			return s.melody.closeHandler(s, code, text)
 		})
 	}
 
 	for {
-		t, message, err := s.conn.ReadMessage()
+		t, message, err := s.Conn.ReadMessage()
 
 		if err != nil {
 			s.melody.errorHandler(s, err)
